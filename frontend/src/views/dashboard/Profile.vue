@@ -1,0 +1,256 @@
+// src/components/dashboard/ProfileSettings.vue
+<script setup lang="ts">
+import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { useProfileStore } from '@/stores/profile'
+
+const profileStore = useProfileStore()
+const successMessage = ref('')
+const companyLogoFile = ref<File | null>(null)
+const avatarFile = ref<File | null>(null)
+const avatarPreview = ref<string | null>(null)
+
+// Computed property to check if profile data is ready
+const isProfileReady = computed(() => profileStore.profile !== null)
+
+const handleCompanyLogoChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    companyLogoFile.value = target.files[0]
+  }
+}
+
+const handleAvatarChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    avatarFile.value = target.files[0]
+    avatarPreview.value = URL.createObjectURL(target.files[0])
+  }
+}
+
+const updateProfile = async () => {
+  if (!isProfileReady.value) return
+
+  try {
+    const formData = new FormData()
+    
+    // Add profile data
+    formData.append('profile_data', JSON.stringify({
+      scheduling_url: profileStore.profile?.scheduling_url,
+      bio: profileStore.profile?.bio,
+      welcome_message: profileStore.profile?.welcome_message,
+      phone: profileStore.profile?.phone,
+      job_title: profileStore.profile?.job_title,
+      full_name: profileStore.profile?.full_name,
+      company: profileStore.profile?.company,
+      time_zone: profileStore.profile?.time_zone
+    }))
+
+    if (companyLogoFile.value) {
+      formData.append('company_logo', companyLogoFile.value)
+    }
+    if (avatarFile.value) {
+      formData.append('avatar', avatarFile.value)
+    }
+
+    await profileStore.updateProfile(formData)
+    successMessage.value = 'Profile updated successfully!'
+    
+    // Clear file inputs
+    const companyLogoInput = document.getElementById('company_logo') as HTMLInputElement
+    const avatarInput = document.getElementById('avatar') as HTMLInputElement
+    if (companyLogoInput) companyLogoInput.value = ''
+    if (avatarInput) avatarInput.value = ''
+    
+    if (avatarPreview.value) {
+      URL.revokeObjectURL(avatarPreview.value)
+      avatarPreview.value = null
+    }
+  } catch (err: any) {
+    console.error('Profile update failed:', err)
+  }
+}
+
+onMounted(async () => {
+  try {
+    await profileStore.fetchProfile()
+  } catch (error) {
+    console.error('Failed to fetch profile:', error)
+  }
+})
+
+onUnmounted(() => {
+  if (avatarPreview.value) {
+    URL.revokeObjectURL(avatarPreview.value)
+  }
+})
+</script>
+
+<template>
+  <div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-6">Profile Settings</h2>
+
+    <!-- Loading State -->
+    <div v-if="profileStore.isLoading" class="flex justify-center items-center py-8">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="profileStore.error" 
+         class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+      {{ profileStore.error }}
+    </div>
+
+    <!-- Success Message -->
+    <div v-if="successMessage" 
+         class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative">
+      {{ successMessage }}
+    </div>
+
+    <!-- Profile Form -->
+    <form v-if="isProfileReady" @submit.prevent="updateProfile" class="space-y-6">
+      <!-- Avatar Section -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Profile Photo</label>
+        <div class="mt-1 flex items-center space-x-5">
+          <div class="flex-shrink-0">
+            <div class="relative h-24 w-24 rounded-full overflow-hidden bg-gray-100">
+              <img
+                v-if="avatarPreview || profileStore.profile?.avatar_url"
+                :src="avatarPreview || `http://127.0.0.1:8000${profileStore.profile?.avatar_url}`"
+                alt="Avatar Preview"
+                class="h-full w-full object-cover"
+              />
+              <span v-else class="h-full w-full flex items-center justify-center text-gray-400">
+                <svg class="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </span>
+            </div>
+          </div>
+          <div class="flex flex-col space-y-2">
+            <label
+              for="avatar"
+              class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+            >
+              Change Photo
+              <input
+                id="avatar"
+                type="file"
+                accept="image/*"
+                @change="handleAvatarChange"
+                class="sr-only"
+              />
+            </label>
+            <p class="text-xs text-gray-500">
+              JPG, PNG, GIF up to 2MB
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Fields -->
+      <div>
+        <label for="full_name" class="block text-sm font-medium text-gray-700">Full Name</label>
+        <input
+          id="full_name"
+          v-model="profileStore.profile.full_name"
+          type="text"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        />
+      </div>
+
+      <div>
+        <label for="job_title" class="block text-sm font-medium text-gray-700">Job Title</label>
+        <input
+          id="job_title"
+          v-model="profileStore.profile.job_title"
+          type="text"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        />
+      </div>
+
+      <div>
+        <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
+        <input
+          id="company"
+          v-model="profileStore.profile.company"
+          type="text"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        />
+      </div>
+
+      <div>
+        <label for="bio" class="block text-sm font-medium text-gray-700">Bio</label>
+        <textarea
+          id="bio"
+          v-model="profileStore.profile.bio"
+          rows="3"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        ></textarea>
+      </div>
+
+      <div>
+        <label for="company_logo" class="block text-sm font-medium text-gray-700">Company Logo</label>
+        <div class="mt-1 flex items-center space-x-4">
+          <img
+            v-if="profileStore.profile.company_logo"
+            :src="`http://127.0.0.1:8000${profileStore.profile.company_logo}`"
+            alt="Company Logo"
+            class="h-12 w-12 object-contain"
+          />
+          <input
+            id="company_logo"
+            type="file"
+            accept="image/*"
+            @change="handleCompanyLogoChange"
+            class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label for="phone" class="block text-sm font-medium text-gray-700">Phone</label>
+        <input
+          id="phone"
+          v-model="profileStore.profile.phone"
+          type="tel"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        />
+      </div>
+
+      <div>
+        <label for="welcome_message" class="block text-sm font-medium text-gray-700">Welcome Message</label>
+        <textarea
+          id="welcome_message"
+          v-model="profileStore.profile.welcome_message"
+          rows="2"
+          class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+        ></textarea>
+      </div>
+
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          :disabled="profileStore.isLoading"
+          class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <svg
+            v-if="profileStore.isLoading"
+            class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          {{ profileStore.isLoading ? 'Saving...' : 'Save Changes' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</template>
