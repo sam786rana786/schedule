@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from typing import Annotated
+from typing import Annotated, Any
 from ...db.database import get_db
-from ...core.auth import verify_password, create_access_token, get_password_hash
+from ...core.auth import verify_password, create_access_token, get_password_hash, get_current_user
 from ...schemas.auth import User, UserCreate, Token
 from ...models.user import User as UserModel
 
@@ -64,3 +64,19 @@ async def login(
     
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/verify-token", response_model=dict)
+async def verify_token(
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Verify token validity and return user info
+    """
+    return {
+        "valid": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "is_active": current_user.is_active
+        }
+    }

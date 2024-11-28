@@ -54,69 +54,80 @@ async def get_profile(
         time_zone=profile.time_zone
     )
 
-@router.put("/me", response_model=Profile)
+@router.put("/me")
 async def update_profile(
     profile_data: str = Form(...),
     company_logo: Optional[UploadFile] = None,
+    avatar: Optional[UploadFile] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
         # Parse the profile_data JSON string
-        profile_data_dict = json.loads(profile_data)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid JSON in profile_data"
+        try:
+            profile_data_dict = json.loads(profile_data)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid JSON in profile_data"
+            )
+
+        # Get or create profile
+        profile = db.query(ProfileModel).filter(ProfileModel.user_id == current_user.id).first()
+        if not profile:
+            profile = ProfileModel(user_id=current_user.id)
+            db.add(profile)
+
+        # Update profile fields
+        for key, value in profile_data_dict.items():
+            if hasattr(profile, key):
+                setattr(profile, key, value)
+
+        # Handle file upload for company logo
+        if company_logo:
+            os.makedirs("uploads/logo", exist_ok=True)
+            file_path = f"uploads/logo/{company_logo.filename}"
+            with open(file_path, "wb") as buffer:
+                content = await company_logo.read()
+                buffer.write(content)
+            profile.company_logo = f"/uploads/logo/{company_logo.filename}"
+
+        # Handle file upload for avatar
+        if avatar:
+            os.makedirs("uploads/avatars", exist_ok=True)
+            file_path = f"uploads/avatars/{avatar.filename}"
+            with open(file_path, "wb") as buffer:
+                content = await avatar.read()
+                buffer.write(content)
+            profile.avatar_url = f"/uploads/avatars/{avatar.filename}"
+
+        try:
+            db.commit()
+            db.refresh(profile)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e)
+            )
+
+        return Profile(
+            id=profile.id,
+            user_id=profile.user_id,
+            email=current_user.email,
+            scheduling_url=profile.scheduling_url,
+            bio=profile.bio,
+            avatar_url=profile.avatar_url,
+            welcome_message=profile.welcome_message,
+            company_logo=profile.company_logo,
+            phone=profile.phone,
+            job_title=profile.job_title,
+            full_name=profile.full_name,
+            company=profile.company,
+            time_zone=profile.time_zone
         )
-
-    # Get or create profile
-    profile = db.query(ProfileModel).filter(ProfileModel.user_id == current_user.id).first()
-    if not profile:
-        profile = ProfileModel(user_id=current_user.id)
-        db.add(profile)
-
-    # Update profile fields
-    for key, value in profile_data_dict.items():
-        if hasattr(profile, key):
-            setattr(profile, key, value)
-
-    # Handle file upload
-    if company_logo:
-        # Create uploads directory if it doesn't exist
-        os.makedirs("uploads/logo", exist_ok=True)
-        
-        # Save the file
-        file_path = f"uploads/logo/{company_logo.filename}"
-        with open(file_path, "wb") as buffer:
-            content = await company_logo.read()
-            buffer.write(content)
-        
-        # Update database with file path
-        profile.company_logo = f"/uploads/logo/{company_logo.filename}"
-
-    try:
-        db.commit()
-        db.refresh(profile)
     except Exception as e:
-        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
-
-    return Profile(
-        id=profile.id,
-        user_id=profile.user_id,
-        email=current_user.email,
-        scheduling_url=profile.scheduling_url,
-        bio=profile.bio,
-        avatar_url=profile.avatar_url,
-        welcome_message=profile.welcome_message,
-        company_logo=profile.company_logo,
-        phone=profile.phone,
-        job_title=profile.job_title,
-        full_name=profile.full_name,
-        company=profile.company,
-        time_zone=profile.time_zone
-    )

@@ -1,6 +1,5 @@
-// src/components/dashboard/ProfileSettings.vue
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useProfileStore } from '@/stores/profile'
 
 const profileStore = useProfileStore()
@@ -9,8 +8,21 @@ const companyLogoFile = ref<File | null>(null)
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
 
-// Computed property to check if profile data is ready
-const isProfileReady = computed(() => profileStore.profile !== null)
+// Create computed properties with default values
+const profile = computed(() => {
+  return {
+    scheduling_url: profileStore.profile?.scheduling_url ?? '',
+    bio: profileStore.profile?.bio ?? '',
+    welcome_message: profileStore.profile?.welcome_message ?? '',
+    phone: profileStore.profile?.phone ?? '',
+    job_title: profileStore.profile?.job_title ?? '',
+    full_name: profileStore.profile?.full_name ?? '',
+    company: profileStore.profile?.company ?? '',
+    time_zone: profileStore.profile?.time_zone ?? '',
+    avatar_url: profileStore.profile?.avatar_url ?? '',
+    company_logo: profileStore.profile?.company_logo ?? ''
+  }
+})
 
 const handleCompanyLogoChange = (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -28,28 +40,36 @@ const handleAvatarChange = (event: Event) => {
 }
 
 const updateProfile = async () => {
-  if (!isProfileReady.value) return
-
   try {
     const formData = new FormData()
     
-    // Add profile data
-    formData.append('profile_data', JSON.stringify({
-      scheduling_url: profileStore.profile?.scheduling_url,
-      bio: profileStore.profile?.bio,
-      welcome_message: profileStore.profile?.welcome_message,
-      phone: profileStore.profile?.phone,
-      job_title: profileStore.profile?.job_title,
-      full_name: profileStore.profile?.full_name,
-      company: profileStore.profile?.company,
-      time_zone: profileStore.profile?.time_zone
-    }))
+    // Create profile data object with all required fields
+    const profileData = {
+      scheduling_url: profile.value.scheduling_url || '',
+      bio: profile.value.bio || '',
+      welcome_message: profile.value.welcome_message || '',
+      phone: profile.value.phone || '',
+      job_title: profile.value.job_title || '',
+      full_name: profile.value.full_name || '',
+      company: profile.value.company || '',
+      time_zone: profile.value.time_zone || 'UTC' // Provide default timezone
+    }
 
+    // Add profile data as JSON string
+    formData.append('profile_data', JSON.stringify(profileData))
+
+    // Add files if selected
     if (companyLogoFile.value) {
       formData.append('company_logo', companyLogoFile.value)
     }
+    
     if (avatarFile.value) {
       formData.append('avatar', avatarFile.value)
+    }
+
+    // Log the form data for debugging
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}:`, value)
     }
 
     await profileStore.updateProfile(formData)
@@ -61,27 +81,31 @@ const updateProfile = async () => {
     if (companyLogoInput) companyLogoInput.value = ''
     if (avatarInput) avatarInput.value = ''
     
+    // Clear preview
     if (avatarPreview.value) {
       URL.revokeObjectURL(avatarPreview.value)
       avatarPreview.value = null
     }
   } catch (err: any) {
     console.error('Profile update failed:', err)
+    // Display error message to user
+    if (err.response?.data?.detail) {
+      successMessage.value = `Error: ${err.response.data.detail}`
+    } else {
+      successMessage.value = 'Error updating profile. Please try again.'
+    }
   }
 }
 
-onMounted(async () => {
-  try {
-    await profileStore.fetchProfile()
-  } catch (error) {
-    console.error('Failed to fetch profile:', error)
-  }
-})
-
+// Cleanup preview URL when component unmounts
 onUnmounted(() => {
   if (avatarPreview.value) {
     URL.revokeObjectURL(avatarPreview.value)
   }
+})
+
+onMounted(() => {
+  profileStore.fetchProfile()
 })
 </script>
 
@@ -89,25 +113,17 @@ onUnmounted(() => {
   <div class="bg-white shadow rounded-lg p-6">
     <h2 class="text-xl font-semibold text-gray-900 mb-6">Profile Settings</h2>
 
-    <!-- Loading State -->
-    <div v-if="profileStore.isLoading" class="flex justify-center items-center py-8">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="profileStore.error" 
-         class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+    <!-- Alerts -->
+    <div v-if="profileStore.error" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
       {{ profileStore.error }}
     </div>
 
-    <!-- Success Message -->
     <div v-if="successMessage" 
          class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative">
       {{ successMessage }}
     </div>
 
-    <!-- Profile Form -->
-    <form v-if="isProfileReady" @submit.prevent="updateProfile" class="space-y-6">
+    <form @submit.prevent="updateProfile" class="space-y-6">
       <!-- Avatar Section -->
       <div>
         <label class="block text-sm font-medium text-gray-700">Profile Photo</label>
@@ -115,8 +131,8 @@ onUnmounted(() => {
           <div class="flex-shrink-0">
             <div class="relative h-24 w-24 rounded-full overflow-hidden bg-gray-100">
               <img
-                v-if="avatarPreview || profileStore.profile?.avatar_url"
-                :src="avatarPreview || `http://127.0.0.1:8000${profileStore.profile?.avatar_url}`"
+                v-if="avatarPreview || profile.avatar_url"
+                :src="avatarPreview || `http://127.0.0.1:8000${profile.avatar_url}`"
                 alt="Avatar Preview"
                 class="h-full w-full object-cover"
               />
@@ -148,12 +164,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Form Fields -->
+      <!-- Other form fields -->
       <div>
         <label for="full_name" class="block text-sm font-medium text-gray-700">Full Name</label>
         <input
           id="full_name"
-          v-model="profileStore.profile.full_name"
+          v-model="profile.full_name"
           type="text"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         />
@@ -163,7 +179,7 @@ onUnmounted(() => {
         <label for="job_title" class="block text-sm font-medium text-gray-700">Job Title</label>
         <input
           id="job_title"
-          v-model="profileStore.profile.job_title"
+          v-model="profile.job_title"
           type="text"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         />
@@ -173,7 +189,7 @@ onUnmounted(() => {
         <label for="company" class="block text-sm font-medium text-gray-700">Company</label>
         <input
           id="company"
-          v-model="profileStore.profile.company"
+          v-model="profile.company"
           type="text"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         />
@@ -183,7 +199,7 @@ onUnmounted(() => {
         <label for="bio" class="block text-sm font-medium text-gray-700">Bio</label>
         <textarea
           id="bio"
-          v-model="profileStore.profile.bio"
+          v-model="profile.bio"
           rows="3"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         ></textarea>
@@ -193,8 +209,8 @@ onUnmounted(() => {
         <label for="company_logo" class="block text-sm font-medium text-gray-700">Company Logo</label>
         <div class="mt-1 flex items-center space-x-4">
           <img
-            v-if="profileStore.profile.company_logo"
-            :src="`http://127.0.0.1:8000${profileStore.profile.company_logo}`"
+            v-if="profile.company_logo"
+            :src="`http://127.0.0.1:8000${profile.company_logo}`"
             alt="Company Logo"
             class="h-12 w-12 object-contain"
           />
@@ -208,21 +224,23 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Phone -->
       <div>
         <label for="phone" class="block text-sm font-medium text-gray-700">Phone</label>
         <input
           id="phone"
-          v-model="profileStore.profile.phone"
+          v-model="profile.phone"
           type="tel"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         />
       </div>
 
+      <!-- Welcome Message -->
       <div>
         <label for="welcome_message" class="block text-sm font-medium text-gray-700">Welcome Message</label>
         <textarea
           id="welcome_message"
-          v-model="profileStore.profile.welcome_message"
+          v-model="profile.welcome_message"
           rows="2"
           class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
         ></textarea>

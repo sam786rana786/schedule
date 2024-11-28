@@ -1,20 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .api.endpoints import auth, profile
+from .api.endpoints import auth, profile, settings, events, event_types, public
 from .db.database import engine
-from .models.user import Base as UserBase
-from .models.profile import Base as ProfileBase
+from .models import user, profile as profile_model, settings as settings_model, sms, event, event_type
 
 # Create tables in correct order
-UserBase.metadata.create_all(bind=engine)
-ProfileBase.metadata.create_all(bind=engine)
+models = [user, profile_model, settings_model, sms, event, event_type]
+for model in models:
+    model.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
 origins = [
     "http://localhost:5173",    # Vite dev server
-    "http://localhost:4173",    # Vite preview
     "http://localhost:3000",    # Alternative port
     "http://127.0.0.1:5173",   # Vite dev server alternative URL
 ]
@@ -38,7 +37,10 @@ app.add_middleware(
 
 # Mount static files directory
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
+app.include_router(public.router, tags=["public"])
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+app.include_router(settings.router, prefix="/api", tags=["settings"])
+app.include_router(events.router, prefix="/api", tags=["events"])
+app.include_router(event_types.router, prefix="/api", tags=["event_types"])

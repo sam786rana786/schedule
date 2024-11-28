@@ -1,38 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { publicRoutes } from './public'
+import { authRoutes } from './auth';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/',
-      name: 'home',
-      component: () => import('@/views/Home.vue')
-    },
-    {
-      path: '/features',
-      name: 'features',
-      component: () => import('@/views/Features.vue')
-    },
-    {
-      path: '/solutions',
-      name: 'solutions',
-      component: () => import('@/views/Solutions.vue')
-    },
-    {
-      path: '/pricing',
-      name: 'pricing',
-      component: () => import('@/views/Pricing.vue')
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/auth/Login.vue')
-    },
-    {
-      path: '/signup',
-      name: 'signup',
-      component: () => import('@/views/auth/SignUp.vue')
-    },
+    ...publicRoutes,
+    ...authRoutes,   
     {
       path: '/dashboard',
       name: 'dashboard',
@@ -45,28 +20,85 @@ const router = createRouter({
       component: () => import('@/views/dashboard/Profile.vue'),
       meta: { requiresAuth: true }
     },
+    {
+      path: '/dashboard/settings',
+      name: 'settings',
+      component: () => import('@/views/dashboard/Settings.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/calendar',
+      name: 'calendar',
+      component: () => import('@/views/dashboard/Calendar.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/event-types',
+      name: 'event-types',
+      component: () => import('@/views/dashboard/EventType.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/event-types/new',
+      name: 'new-event-type',
+      component: () => import('@/views/dashboard/EventTypeForm.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/event-types/:id/edit',
+      name: 'edit-event-type',
+      component: () => import('@/views/dashboard/EventTypeForm.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/scheduled',
+      name: 'scheduled-events',
+      component: () => import('@/views/dashboard/ScheduledEvents.vue'),
+      meta: { requiresAuth: true }
+    }
   ],
 })
 
-router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('token'); // You might want to use a more secure auth check
-  console.log('Navigation guard - Auth status:', !!isAuthenticated);
-  console.log('Navigating to:', to.path);
-
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    console.log('Auth required but not authenticated, redirecting to login');
-    next('/login');
-    return;
-  } 
-  if ((to.path === '/login' || to.path === '/signup') && isAuthenticated) {
-    console.log('Already authenticated, redirecting to dashboard');
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore();
+  
+  // Check if route requires auth
+  if (to.meta.requiresAuth) {
+    try {
+      // Verify token validity
+      const isValid = await authStore.checkAuth();
+      
+      if (!isValid) {
+        // Redirect to login with message if token is invalid
+        next({
+          path: '/login',
+          query: { 
+            returnUrl: to.fullPath,
+            message: 'Logged out due to inactivity'
+          }
+        });
+        return;
+      }
+    } catch (error) {
+      // Handle any errors during auth check
+      next({
+        path: '/login',
+        query: { 
+          returnUrl: to.fullPath,
+          message: 'Authentication error occurred'
+        }
+      });
+      return;
+    }
+  }
+  
+  // If the user is authenticated and tries to access login/signup pages
+  if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/signup')) {
     next('/dashboard');
     return;
   }
-
-  console.log('Proceeding with navigation');
-  next();
   
+  next();
 });
 
 export default router;

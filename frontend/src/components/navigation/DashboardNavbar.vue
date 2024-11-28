@@ -1,17 +1,30 @@
 // src/components/navigation/DashboardNavbar.vue
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Menu } from 'lucide-vue-next'; // You might need to install lucide-vue-next
+import { useProfileStore } from '@/stores/profile';
 
 interface UserDropdownItem {
   label: string;
   action: () => void;
 }
 
+const profileStore = useProfileStore();
 const router = useRouter();
 const isProfileMenuOpen = ref(false);
 const searchQuery = ref('');
+const dropdownRef = ref<HTMLElement | null>(null)
+
+const toggleDropdown = () => {
+  isProfileMenuOpen.value = !isProfileMenuOpen.value
+}
+
+const closeDropdown = (e: MouseEvent) => {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
+    isProfileMenuOpen.value = false
+  }
+}
 
 const handleLogout = () => {
   localStorage.removeItem('token');
@@ -32,6 +45,18 @@ const userDropdownItems: UserDropdownItem[] = [
     action: handleLogout
   }
 ];
+
+onMounted(() => {
+  document.addEventListener('click', closeDropdown)
+  router.afterEach(() => {
+    isProfileMenuOpen.value = false
+  })
+  profileStore.fetchProfile() // Fetch profile when navbar mounts
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDropdown)
+})
 </script>
 
 <template>
@@ -42,7 +67,7 @@ const userDropdownItems: UserDropdownItem[] = [
         <div class="flex">
           <!-- Search input -->
           <div class="flex-1 flex items-center pl-2 md:ml-6">
-            <div class="max-w-lg w-full lg:max-w-xs">
+            <!-- <div class="max-w-lg w-full lg:max-w-xs">
               <label for="search" class="sr-only">Search</label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -57,7 +82,7 @@ const userDropdownItems: UserDropdownItem[] = [
                   class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Search" type="search">
               </div>
-            </div>
+            </div> -->
           </div>
         </div>
 
@@ -75,13 +100,16 @@ const userDropdownItems: UserDropdownItem[] = [
           </button>
 
           <!-- Profile dropdown -->
-          <div class="ml-3 relative">
+          <div class="ml-3 relative" ref="dropdownRef">
             <div>
-              <button @click="isProfileMenuOpen = !isProfileMenuOpen" type="button"
+              <button @click="toggleDropdown" type="button"
                 class="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 id="user-menu-button">
                 <span class="sr-only">Open user menu</span>
-                <img class="h-8 w-8 rounded-full"
+                <img v-if="profileStore.profile?.company_logo" class="h-8 w-8 rounded-full"
+                  :src="`http://127.0.0.1:8000${profileStore.profile.avatar_url}`"
+                  alt="">
+                <img v-else class="h-8 w-8 rounded-full"
                   src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
                   alt="">
               </button>

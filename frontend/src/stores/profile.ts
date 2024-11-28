@@ -1,6 +1,6 @@
 // src/stores/profile.ts
 import { defineStore } from 'pinia'
-import axios from '@/plugins/axios'
+import axios from 'axios'
 import { ref } from 'vue'
 
 interface Profile {
@@ -27,11 +27,14 @@ export const useProfileStore = defineStore('profile', () => {
   async function fetchProfile() {
     try {
       isLoading.value = true
-      error.value = ''
-      const response = await axios.get('/api/profile/me')
+      const token = localStorage.getItem('token')
+      const response = await axios.get('http://127.0.0.1:8000/api/profile/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       profile.value = response.data
     } catch (err: any) {
-      console.error('Error fetching profile:', err)
       error.value = err.response?.data?.detail || 'Error loading profile'
       throw err
     } finally {
@@ -43,8 +46,29 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       isLoading.value = true
       error.value = ''
-      const response = await axios.put('/api/profile/me', formData)
+      
+      // Get the profile data from the FormData
+      const profileData = formData.get('profile_data')
+      if (typeof profileData !== 'string') {
+        throw new Error('Invalid profile data')
+      }
+
+      // Log the data being sent for debugging
+      console.log('Profile Data:', JSON.parse(profileData))
+      
+      const token = localStorage.getItem('token')
+      const response = await axios.put(
+        'http://127.0.0.1:8000/api/profile/me',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          }
+        }
+      )
       profile.value = response.data
+      return response.data
     } catch (err: any) {
       console.error('Error updating profile:', err)
       error.value = err.response?.data?.detail || 'Error updating profile'

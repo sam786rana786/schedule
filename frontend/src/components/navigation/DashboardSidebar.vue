@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useProfileStore } from '@/stores/profile';
 
 interface NavItem {
   name: string;
   path: string;
   icon: string;
 }
-
+const profileStore = useProfileStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -46,7 +47,8 @@ const isCurrentRoute = computed(() => (path: string) => route.path === path);
   <div class="hidden md:flex md:w-64 md:flex-col">
     <div class="flex flex-col flex-grow border-r border-gray-200 pt-5 bg-white overflow-y-auto">
       <div class="flex items-center flex-shrink-0 px-4">
-        <img class="h-8 w-auto" src="@/assets/logo.svg" alt="Schedule">
+        <img v-if="profileStore.profile?.company_logo" class="h-8 w-auto" :src="`http://127.0.0.1:8000${profileStore.profile.company_logo}`" alt="Schedule">
+        <img v-else class="h-8 w-auto" src="@/assets/logo.svg" alt="Schedule">
       </div>
       <div class="mt-5 flex-grow flex flex-col">
         <nav class="flex-1 px-2 bg-white space-y-1">

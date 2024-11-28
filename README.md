@@ -46,3 +46,5 @@ Commands to Run are:
 3. pip install -r requirements.txt
 4. uvicorn app.main:app --reload
 5. It will rin on 0.0.0.0 --host: 8000
+
+deactivate && source venv/Scripts/activate && cd backend

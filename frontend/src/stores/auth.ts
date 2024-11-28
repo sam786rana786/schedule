@@ -1,53 +1,54 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import axiosInstance from '@/plugins/axios';
+import { ref } from 'vue';
+import axios from '@/plugins/axios';
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('token'));
-  const isAuthenticated = computed(() => !!token.value);
+  const isAuthenticated = ref(!!localStorage.getItem('token'));
 
-  function setToken(newToken: string | null) {
-    token.value = newToken;
-    if (newToken) {
-      localStorage.setItem('token', newToken);
-      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } else {
-      localStorage.removeItem('token');
-      delete axiosInstance.defaults.headers.common['Authorization'];
+  async function login(email: string, password: string) {
+    try {
+      const response = await axios.post<{ access_token: string }>(
+        'api/auth/token',
+        new URLSearchParams({
+          username: email,
+          password: password,
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+
+      const token = response.data.access_token;
+      localStorage.setItem('token', token);
+      isAuthenticated.value = true;
+      return token;
+    } catch (error) {
+      throw error;
     }
   }
 
-  async function login(email: string, password: string) {
-    const response = await axiosInstance.post<{ access_token: string }>(
-      'api/auth/token',
-      new URLSearchParams({
-        username: email,
-        password: password,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
-    setToken(response.data.access_token);
-    return response.data;
+  async function logout() {
+    localStorage.removeItem('token');
+    isAuthenticated.value = false;
   }
 
-  function logout() {
-    setToken(null);
-  }
-
-  // Initialize axios header if token exists
-  if (token.value) {
-    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token.value}`;
+  async function checkAuth() {
+    try {
+      await axios.get('api/auth/verify-token');
+      isAuthenticated.value = true;
+      return true;
+    } catch (error) {
+      isAuthenticated.value = false;
+      return false;
+    }
   }
 
   return {
-    token,
     isAuthenticated,
     login,
     logout,
-    setToken,
+    checkAuth
   };
 });
