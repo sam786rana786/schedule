@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
-import { Calendar, ChevronLeft, ChevronRight, Clock, Video, MapPin, Phone, Trash, Edit } from 'lucide-vue-next';
+import { ref, onMounted, watch } from 'vue';
+import { useScheduledEventsStore } from '@/stores/scheduledEvents';
 import { useNotificationStore } from '@/stores/notification';
-import axios from '@/plugins/axios';
+import { Trash } from 'lucide-vue-next';
+import {
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+  TransitionRoot
+} from '@headlessui/vue';
 
 interface Event {
   id: number;
@@ -11,248 +17,248 @@ interface Event {
   end_time: string;
   attendee_name: string;
   attendee_email: string;
-  location: string;
+  attendee_phone: string;
+  event_type_id: number;
   status: string;
-  notes?: string;
 }
 
-// State management
-const events = ref<Event[]>([]);
-const isLoading = ref(true);
-const error = ref<string | null>(null);
-const currentTab = ref('upcoming');
-const currentPage = ref(1);
-const totalPages = ref(1);
-const searchQuery = ref('');
-const showCancelModal = ref(false);
-const selectedEvent = ref<Event | null>(null);
-
+const scheduledEventsStore = useScheduledEventsStore();
 const notificationStore = useNotificationStore();
 
-// Filter tabs
+// State
+const activeTab = ref<'upcoming' | 'past' | 'today'>('upcoming');
+const currentPage = ref(1);
+const searchQuery = ref('');
+
+// Add new refs for cancel modal
+const showCancelModal = ref(false);
+const selectedEvent = ref<Event | null>(null);
+const cancelReason = ref('');
+
+// Computed properties for sections
 const tabs = [
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'past', label: 'Past' }
-];
+  { id: 'upcoming', label: 'Upcoming Events' },
+  { id: 'today', label: 'Today\'s Events' },
+  { id: 'past', label: 'Past Events' }
+] as const;
 
-// Location formatting helper
-const formatLocation = (locationType: string) => {
-  switch (locationType) {
-    case 'google_meet': return 'Google Meet';
-    case 'zoom': return 'Zoom';
-    case 'phone': return 'Phone Call';
-    case 'in_person': return 'In Person';
-    default: return locationType;
-  }
+// Methods
+const handleTabChange = async (tab: 'upcoming' | 'past' | 'today') => {
+  activeTab.value = tab;
+  currentPage.value = 1; // Reset to first page on tab change
+  await fetchEvents();
 };
 
-// Get icon component based on location type
-const getLocationIcon = (locationType: string) => {
-  switch (locationType) {
-    case 'google_meet':
-    case 'zoom':
-      return Video;
-    case 'phone':
-      return Phone;
-    case 'in_person':
-      return MapPin;
-    default:
-      return Video;
-  }
-};
-
-// Format date and time helper
-const formatDateTime = (dateString: string) => {
+const formatEventTime = (dateString: string) => {
   const date = new Date(dateString);
   return {
-    date: date.toLocaleDateString(undefined, { 
-      weekday: 'long', 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
+    date: date.toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     }),
-    time: date.toLocaleTimeString(undefined, { 
-      hour: 'numeric', 
-      minute: '2-digit' 
+    time: date.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     })
   };
 };
 
-// Fetch events from the API
 const fetchEvents = async () => {
-  try {
-    isLoading.value = true;
-    const response = await axios.get('/api/events', {
-      params: {
-        status: currentTab.value,
-        page: currentPage.value,
-        q: searchQuery.value
-      }
-    });
-    
-    events.value = response.data.items;
-    totalPages.value = response.data.pages;
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || 'Failed to load events';
-    notificationStore.showNotification('error', error.value || 'An unknown error occurred');
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-const eventTypes = [
-  { id: '30-min', name: '30-minute Events', count: 5 },
-  { id: '45-min', name: '45-minute Events', count: 5 },
-];
-
-const activeTab = ref('30-min');
-
-const activeEventType = computed(() => {
-  return eventTypes.find(type => type.id === activeTab.value) || eventTypes[0];
-});
-
-const handleTabChange = (tab: string) => {
-  activeTab.value = tab;
-  fetchEvents();
-};
-
-// Handle tab changes
-const handleTabChange1 = (tab: string) => {
-  currentTab.value = tab;
-  currentPage.value = 1;
-  fetchEvents();
+  await scheduledEventsStore.fetchEvents({
+    status: activeTab.value,
+    page: currentPage.value,
+    q: searchQuery.value || undefined
+  });
 };
 
 // Handle pagination
-const handlePageChange = (page: number) => {
-  currentPage.value = page;
-  fetchEvents();
+const handlePageChange = async (newPage: number) => {
+  currentPage.value = newPage;
+  await fetchEvents();
 };
 
-// Handle event cancellation
+// Handle search
+const handleSearch = async () => {
+  currentPage.value = 1; // Reset to first page when searching
+  await fetchEvents();
+};
+
+// Add cancel event handler
 const handleCancelEvent = async () => {
-  if (!selectedEvent.value) return;
-  
+  if (!selectedEvent.value || !cancelReason.value) return;
+
   try {
-    await axios.delete(`/api/events/${selectedEvent.value.id}`);
+    await scheduledEventsStore.cancelEvent(
+      selectedEvent.value.id,
+      cancelReason.value
+    );
+    
     notificationStore.showNotification('success', 'Event cancelled successfully');
-    fetchEvents();
-  } catch (err: any) {
-    notificationStore.showNotification('error', 'Failed to cancel event');
-  } finally {
     showCancelModal.value = false;
+    cancelReason.value = '';
     selectedEvent.value = null;
+    
+    // Refresh events list
+    await fetchEvents();
+  } catch (error) {
+    console.error('Failed to cancel event:', error);
+    notificationStore.showNotification('error', 'Failed to cancel event');
   }
 };
 
-// Initialize data on component mount
-onMounted(() => {
+// Watch for tab changes
+watch([activeTab, currentPage], () => {
   fetchEvents();
 });
+
+onMounted(fetchEvents);
 </script>
 
 <template>
-    <div class="py-6">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 class="text-2xl font-semibold text-gray-900">Scheduled Events</h1>
-  
-        <EventTypeTabs
-          :event-types="eventTypes"
-          :active-tab="activeTab"
-          @tab-change="handleTabChange"
-        />
-  
-        <!-- Events List -->
-        <div v-if="events.length > 0" class="mt-6 bg-white shadow overflow-hidden sm:rounded-md">
-          <h2 class="px-4 py-4 text-lg font-medium text-gray-900">
-            {{ activeEventType.name }} ({{ events.length }})
-          </h2>
-          <ul role="list" class="divide-y divide-gray-200">
-            <li v-for="event in events" :key="event.id" class="px-4 py-4 sm:px-6 hover:bg-gray-50">
-              <div class="flex items-center justify-between">
-                <!-- Attendee Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center">
-                    <div class="ml-4">
-                      <div class="text-sm text-gray-900">{{ event.attendee_name }}</div>
-                      <div class="text-sm text-gray-500">{{ event.attendee_email }}</div>
-                    </div>
-                  </div>
-                </div>
-  
-                <!-- Actions -->
-                <div class="ml-4 flex-shrink-0 flex space-x-2">
-                  <button
-                    @click="selectedEvent = event; showCancelModal = true"
-                    class="text-gray-400 hover:text-red-500"
-                    v-if="activeTab === 'upcoming'"
-                  >
-                    <Trash class="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            </li>
-          </ul>
-  
-          <!-- Pagination -->
-          <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div class="flex-1 flex justify-between items-center">
-              <button
-                @click="handlePageChange(currentPage - 1)"
-                :disabled="currentPage === 1"
-                class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <span class="text-sm text-gray-700">
-                Page {{ currentPage }} of {{ totalPages }}
-              </span>
-              <button
-                @click="handlePageChange(currentPage + 1)"
-                :disabled="currentPage === totalPages"
-                class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+  <div class="py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-2xl font-semibold text-gray-900">Scheduled Events</h1>
+
+      <!-- Search Bar -->
+      <div class="mt-4">
+        <div class="max-w-md">
+          <div class="relative">
+            <input v-model="searchQuery" @input="handleSearch" type="text"
+              class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Search events..." />
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center">
+              <!-- Search Icon -->
+              <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                  d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                  clip-rule="evenodd" />
+              </svg>
+            </span>
           </div>
         </div>
-  
-        <!-- Empty State -->
-        <div v-else class="mt-6 text-center py-12 bg-white shadow rounded-lg">
-          <Calendar class="mx-auto h-12 w-12 text-gray-400" />
-          <h3 class="mt-2 text-sm font-medium text-gray-900">No events</h3>
-          <p class="mt-1 text-sm text-gray-500">
-            {{ activeTab === 'upcoming' ? "You don't have any upcoming events." : "You don't have any past events." }}
-          </p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="mt-4 border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button v-for="tab in tabs" :key="tab.id" @click="handleTabChange(tab.id)" :class="[
+            activeTab === tab.id
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
+            'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm'
+          ]">
+            {{ tab.label }}
+          </button>
+        </nav>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="scheduledEventsStore.isLoading" class="mt-6 text-center">
+        <div class="inline-flex items-center px-4 py-2">
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+          </svg>
+          Loading events...
         </div>
       </div>
-  
-      <!-- Cancel Event Modal -->
-      <div v-if="showCancelModal" class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <!-- Modal content -->
+
+      <!-- Events List -->
+      <div v-else-if="scheduledEventsStore.events.items.length > 0" class="mt-6">
+        <ul role="list" class="divide-y divide-gray-200">
+          <li v-for="event in scheduledEventsStore.events.items" :key="event.id" class="py-4">
+            <div class="flex items-center space-x-4">
+              <div class="flex-1">
+                <h3 class="text-sm font-medium text-gray-900">{{ event.title }}</h3>
+                <div class="mt-1 text-sm text-gray-500">
+                  <div>{{ formatEventTime(event.start_time).date }}</div>
+                  <div>{{ formatEventTime(event.start_time).time }} - {{ formatEventTime(event.end_time).time }}</div>
+                </div>
+              </div>
+              <div class="text-sm text-gray-500">
+                <div>{{ event.attendee_name }}</div>
+                <div>{{ event.attendee_email }}</div>
+                <div>{{ event.attendee_phone }}</div>
+              </div>
+              <!-- Cancel Button -->
+              <button @click="selectedEvent = event; showCancelModal = true"
+                class="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50" title="Cancel Event">
+                <Trash class="h-5 w-5" />
+              </button>
+            </div>
+          </li>
+        </ul>
+
+        <!-- Pagination -->
+        <div class="mt-4 flex items-center justify-between">
+          <div class="flex-1 flex justify-between sm:hidden">
+            <button @click="handlePageChange(currentPage - 1)" :disabled="currentPage === 1"
+              class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              Previous
+            </button>
+            <button @click="handlePageChange(currentPage + 1)"
+              :disabled="currentPage === scheduledEventsStore.events.pages"
+              class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else class="mt-6 text-center">
+        <p class="text-gray-500">No events found</p>
       </div>
     </div>
-  </template>
+  </div>
 
-<style scoped>
-/* Add smooth transitions for hover states */
-.hover\:bg-gray-50:hover {
-  transition: background-color 150ms ease-in-out;
-}
+  <!-- Cancel Modal -->
+  <TransitionRoot appear :show="showCancelModal" as="template">
+    <Dialog as="div" @close="showCancelModal = false" class="relative z-50">
+      <div class="fixed inset-0 bg-black/30" />
 
-/* Ensure buttons have a nice hover effect */
-button {
-  transition: all 150ms ease-in-out;
-}
+      <div class="fixed inset-0 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+          <DialogPanel
+            class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+            <DialogTitle as="h3" class="text-lg font-medium text-gray-900">
+              Cancel Event
+            </DialogTitle>
 
-/* Add subtle animation to the calendar icon in empty state */
-.empty-state-icon {
-  animation: float 3s ease-in-out infinite;
-}
+            <div class="mt-4">
+              <p class="text-sm text-gray-500">
+                Are you sure you want to cancel this event? This will notify the attendee.
+              </p>
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-</style>
+              <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700">
+                  Reason for cancellation
+                </label>
+                <textarea v-model="cancelReason" rows="3"
+                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  placeholder="Please provide a reason for cancellation..." />
+              </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3">
+              <button @click="showCancelModal = false"
+                class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button @click="handleCancelEvent" :disabled="!cancelReason || !selectedEvent"
+                class="inline-flex justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                Confirm Cancellation
+              </button>
+            </div>
+          </DialogPanel>
+        </div>
+      </div>
+    </Dialog>
+  </TransitionRoot>
+</template>

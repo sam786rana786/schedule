@@ -55,7 +55,7 @@ const router = createRouter({
       name: 'scheduled-events',
       component: () => import('@/views/dashboard/ScheduledEvents.vue'),
       meta: { requiresAuth: true }
-    }
+    },
   ],
 })
 

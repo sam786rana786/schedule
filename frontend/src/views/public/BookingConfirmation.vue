@@ -12,8 +12,9 @@ interface BookingDetails {
   event_type_id: number
   start_time: string
   end_time: string
-  name: string
-  email: string
+  attendee_name: string
+  attendee_email: string
+  attendee_phone: string
   location: string
   notes?: string
   answers?: Record<string, any>
@@ -178,13 +179,15 @@ onMounted(async () => {
             </div>
 
             <!-- Additional Notes -->
-            <div v-if="booking.notes" class="border-t border-gray-200 pt-6">
-              <h4 class="text-sm font-medium text-gray-900">Additional Notes</h4>
-              <p class="mt-1 text-sm text-gray-500">{{ booking.notes }}</p>
+            <div v-if="booking" class="border-t border-gray-200 pt-6">
+              <h4 class="text-sm font-medium text-gray-900">Your Details</h4>
+              <p class="mt-1 text-sm text-gray-500">{{ booking?.attendee_name }}</p>
+              <p class="mt-1 text-sm text-gray-500">{{ booking?.attendee_email }}</p>
+              <p class="mt-1 text-sm text-gray-500">{{ booking?.attendee_phone }}</p>
             </div>
 
             <!-- Custom Questions -->
-            <div v-if="booking?.answers" class="border-t border-gray-200 pt-6">
+            <div v-if="booking.answers" class="border-t border-gray-200 pt-6">
               <h4 class="text-sm font-medium text-gray-900 mb-4">Additional Information</h4>
               <dl class="space-y-3">
                 <template v-for="(answer, label) in formattedAnswers" :key="label">

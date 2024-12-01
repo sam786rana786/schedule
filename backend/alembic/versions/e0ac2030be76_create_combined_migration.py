@@ -114,6 +114,7 @@ def upgrade() -> None:
         sa.Column('description', sa.String(), nullable=True),
         sa.Column('attendee_name', sa.String(), nullable=True),
         sa.Column('attendee_email', sa.String(), nullable=True),
+        sa.Column('attendee_phone', sa.String(), nullable=True),
         sa.Column('location', sa.String(), nullable=True),
         sa.Column('answers', sa.JSON(), nullable=True),
         sa.Column('is_confirmed', sa.Boolean(), default=False),

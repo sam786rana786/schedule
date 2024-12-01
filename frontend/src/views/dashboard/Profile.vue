@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import axios from '@/plugins/axios';
 import { useProfileStore } from '@/stores/profile'
 
 const profileStore = useProfileStore()
@@ -7,6 +8,7 @@ const successMessage = ref('')
 const companyLogoFile = ref<File | null>(null)
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
+const timezones = ref<string[]>([]);
 
 // Create computed properties with default values
 const profile = computed(() => {
@@ -23,6 +25,16 @@ const profile = computed(() => {
     company_logo: profileStore.profile?.company_logo ?? ''
   }
 })
+
+// Fetch available timezones
+const fetchTimezones = async () => {
+  try {
+    const response = await axios.get('/api/profile/timezones');
+    timezones.value = response.data;
+  } catch (error) {
+    console.error('Failed to fetch timezones:', error);
+  }
+};
 
 const handleCompanyLogoChange = (event: Event) => {
   const target = event.target as HTMLInputElement
@@ -104,8 +116,11 @@ onUnmounted(() => {
   }
 })
 
-onMounted(() => {
-  profileStore.fetchProfile()
+onMounted(async () => {
+  await Promise.all([
+    profileStore.fetchProfile(),
+    fetchTimezones()
+  ]);
 })
 </script>
 
@@ -223,6 +238,20 @@ onMounted(() => {
           />
         </div>
       </div>
+
+      <div>
+      <label for="timezone" class="block text-sm font-medium text-gray-700">Timezone</label>
+      <select
+        id="timezone"
+        v-model="profile.time_zone"
+        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+      >
+        <option value="">Select a timezone</option>
+        <option v-for="tz in timezones" :key="tz" :value="tz">
+          {{ tz }}
+        </option>
+      </select>
+    </div>
 
       <!-- Phone -->
       <div>

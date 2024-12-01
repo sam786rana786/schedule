@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from typing import Annotated, Any
 from ...db.database import get_db
 from ...core.auth import verify_password, create_access_token, get_password_hash, get_current_user
-from ...schemas.auth import User, UserCreate, Token
+from ...schemas.auth import User, UserCreate, Token, UserMe
 from ...models.user import User as UserModel
 
 router = APIRouter()
@@ -80,3 +80,25 @@ async def verify_token(
             "is_active": current_user.is_active
         }
     }
+
+@router.get("/me", response_model=UserMe)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Get current user information
+    """
+    try:
+        return {
+            "valid": True,
+            "id": current_user.id,
+            "email": current_user.email,
+            "name": current_user.profile.full_name if current_user.profile else None,
+            "phone": current_user.profile.phone if current_user.profile else None,
+            "is_active": current_user.is_active
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching user data: {str(e)}"
+        )

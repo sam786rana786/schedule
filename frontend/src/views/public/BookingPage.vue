@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePublicBookingStore } from '@/stores/publicBooking';
 import { Calendar, ChevronLeft, ChevronRight, Clock, Video, Phone, MapPin } from 'lucide-vue-next';
@@ -30,27 +30,44 @@ const selectedTime = ref<string | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
 const currentMonth = ref(new Date());
+const availableTimeSlots = ref<TimeSlot[]>([]);
+const isLoadingSlots = ref(false);
 
-// Time slots generation
-const availableTimeSlots = computed<TimeSlot[]>(() => {
-  if (!selectedDate.value) return [];
 
-  const slots: TimeSlot[] = [];
-  const startHour = 9;
-  const endHour = 17;
+watch(selectedDate, async (newDate) => {
+  if (!newDate || !eventType.value?.id) return;
 
-  for (let hour = startHour; hour < endHour; hour++) {
-    for (let minutes of [0, 30]) {
-      const time = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      slots.push({
-        time,
-        available: true // You'll need to implement availability check based on existing bookings
-      });
-    }
+  try {
+    isLoadingSlots.value = true;
+    const dateStr = new Date(newDate.getTime() - newDate.getTimezoneOffset() * 60000)
+      .toISOString()
+      .split('T')[0];
+
+    const response = await bookingStore.getAvailableSlots(eventType.value.id, dateStr);
+
+    availableTimeSlots.value = response.available_slots.map((time: string) => {
+      // Convert plain time to AM/PM format
+      const [hours, minutes] = time.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes);
+
+      return {
+        time: date.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        }),
+        available: true,
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching slots:', error);
+    availableTimeSlots.value = [];
+  } finally {
+    isLoadingSlots.value = false;
   }
-
-  return slots;
 });
+
 
 // Calendar data
 const calendarWeeks = computed(() => {
@@ -281,22 +298,33 @@ const handleNextMonth = async () => {
           </div>
 
           <!-- Time slots -->
-          <div v-if="selectedDate" class="mt-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">
-              Available times for {{ selectedDate.toLocaleDateString() }}
-            </h3>
-            <div class="grid grid-cols-4 gap-2">
-              <button v-for="slot in availableTimeSlots" :key="slot.time" @click="handleTimeSelect(slot.time)"
-                :disabled="!slot.available" :class="[
-                  'px-4 py-2 text-sm rounded-lg border',
-                  slot.available
-                    ? 'text-gray-900 border-gray-300 hover:border-blue-500'
-                    : 'text-gray-400 bg-gray-50 cursor-not-allowed'
-                ]">
-                {{ slot.time }}
-              </button>
+          <template v-if="selectedDate">
+            <div class="mt-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">
+                Available times for {{ selectedDate.toLocaleDateString() }}
+              </h3>
+              <div v-if="isLoadingSlots" class="text-center py-4">
+                <svg class="animate-spin h-5 w-5 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none"
+                  viewBox="0 0 24 24">
+                  <!-- ... loading spinner SVG ... -->
+                </svg>
+              </div>
+              <div v-else-if="availableTimeSlots.length === 0" class="text-center py-4 text-gray-500">
+                No available time slots for this date.
+              </div>
+              <div class="grid grid-cols-4 gap-2" v-else>
+                <button v-for="slot in availableTimeSlots" :key="slot.time" @click="handleTimeSelect(slot.time)"
+                  :disabled="!slot.available" :class="[
+                    'px-4 py-2 text-sm rounded-lg border',
+                    slot.available
+                      ? 'text-gray-900 border-gray-300 hover:border-blue-500'
+                      : 'text-gray-400 bg-gray-50 cursor-not-allowed'
+                  ]">
+                  {{ slot.time }}
+                </button>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>

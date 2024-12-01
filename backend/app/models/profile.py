@@ -16,6 +16,6 @@ class Profile(Base):
     phone = Column(String, nullable=True)
     job_title = Column(String, nullable=True)
     company = Column(String, nullable=True)
-    time_zone = Column(String)
+    time_zone = Column(String, default="Asia/Kolkata")
     
     user = relationship("User", back_populates="profile")

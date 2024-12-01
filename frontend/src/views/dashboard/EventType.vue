@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import EventTypesList from '@/components/event-types/EventTypesList.vue';
+import { onMounted, ref } from 'vue';
 import { useEventTypeStore } from '@/stores/eventType';
+import { useNotificationStore } from '@/stores/notification';
+import EventTypesList from '@/components/event-types/EventTypesList.vue';
 
 const eventTypeStore = useEventTypeStore();
+const notificationStore = useNotificationStore();
 
 onMounted(async () => {
   try {
@@ -12,6 +14,27 @@ onMounted(async () => {
     console.error('Failed to fetch event types:', error);
   }
 });
+
+const handleToggle = async (id: number) => {
+  try {
+    await eventTypeStore.toggleEventType(id);
+    notificationStore.showNotification('success', 'Event type updated successfully');
+  } catch (error) {
+    notificationStore.showNotification('error', 'Failed to update event type');
+  }
+};
+
+const copyBookingUrl = async (slug: string) => {
+  const baseUrl = window.location.origin;
+  const bookingUrl = `${baseUrl}/book/${slug}`;
+  
+  try {
+    await navigator.clipboard.writeText(bookingUrl);
+    notificationStore.showNotification('success', 'Booking URL copied to clipboard');
+  } catch (error) {
+    notificationStore.showNotification('error', 'Failed to copy URL');
+  }
+};
 </script>
 
 <template>
@@ -29,7 +52,12 @@ onMounted(async () => {
     </div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
       <div class="py-4">
-        <EventTypesList />
+        <EventTypesList 
+          :event-types="eventTypeStore.eventTypes"
+          :is-loading="eventTypeStore.isLoading"
+          @toggle="handleToggle"
+          @copy-url="copyBookingUrl"
+        />
       </div>
     </div>
   </div>

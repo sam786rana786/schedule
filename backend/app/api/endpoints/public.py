@@ -11,6 +11,7 @@ from ...models.profile import Profile
 from ...models.settings import Settings
 from ...schemas.event_type import EventType as EventTypeSchema
 from ...schemas.booking import BookingCreate, BookingResponse
+from ...utils.notifications import send_booking_confirmation_email, send_booking_confirmation_sms
 
 router = APIRouter()
 
@@ -152,101 +153,115 @@ async def get_public_availability(
         if is_available:
             slots.append(current_time.strftime("%H:%M"))
 
-        current_time += timedelta(minutes=30)  # 30-minute intervals
+        current_time += timedelta(minutes=event_type.duration)  # event-type duration
 
     return {"available_slots": slots}
 
-@router.post("/public/bookings")
+@router.post("/public/bookings", response_model=BookingResponse)
 async def create_public_booking(
     booking: BookingCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new booking"""
+    """Create a public booking"""
     try:
-        # Validate date format
-        if not validate_date_format(booking.date):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid date format. Use YYYY-MM-DD (e.g., 2024-11-28)"
-            )
-
-        # Validate time format
-        if not validate_time_format(booking.time):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid time format. Use HH:MM in 24-hour format (e.g., 14:30)"
-            )
-
-        # Verify event type exists and is active
-        event_type = db.query(EventType).filter(
-            EventType.id == booking.event_type_id,
-            EventType.is_active == True
-        ).first()
-
+        # Get event type and host user
+        event_type = db.query(EventType).filter(EventType.id == booking.event_type_id).first()
         if not event_type:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Event type not found"
-            )
+            raise HTTPException(status_code=404, detail="Event type not found")
 
+        host_user = db.query(User).filter(User.id == event_type.user_id).first()
+        if not host_user:
+            raise HTTPException(status_code=404, detail="Host user not found")
+            
+        # Combine date and time
+        datetime_str = f"{booking.date}T{booking.time}"
         try:
-            # Parse date and time
-            start_time = datetime.strptime(f"{booking.date} {booking.time}", "%Y-%m-%d %H:%M")
-            
-            # Validate that the date is not in the past
-            if start_time < datetime.now():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot book appointments in the past"
-                )
-            
-            end_time = start_time + timedelta(minutes=event_type.duration)
-        except ValueError as e:
+            start_time = datetime.fromisoformat(datetime_str)
+        except ValueError:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Error parsing date/time: {str(e)}"
+                status_code=400,
+                detail="Invalid date or time format. Expected YYYY-MM-DD and HH:MM"
             )
 
-        # Check if slot is available
-        existing_booking = db.query(Event).filter(
-            Event.event_type_id == booking.event_type_id,
-            Event.start_time < end_time,
-            Event.end_time > start_time
-        ).first()
+        end_time = start_time + timedelta(minutes=event_type.duration)
 
-        if existing_booking:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Time slot is no longer available"
-            )
-
-        # Create new event
-        new_event = Event(
+        # Create booking
+        db_booking = Event(
+            user_id=host_user.id,
             event_type_id=booking.event_type_id,
-            user_id=event_type.user_id,
             title=event_type.name,
             start_time=start_time,
             end_time=end_time,
+            description=booking.notes or f"Slot booked by {booking.name}",
             attendee_name=booking.name,
             attendee_email=booking.email,
-            description=booking.notes,
+            attendee_phone=booking.phone,
             location=booking.location,
             answers=booking.answers,
             is_confirmed=True
         )
-
-        db.add(new_event)
+        
+        db.add(db_booking)
         db.commit()
-        db.refresh(new_event)
+        db.refresh(db_booking)
 
-        return {
-            "id": new_event.id,
-            "start_time": new_event.start_time.isoformat(),
-            "end_time": new_event.end_time.isoformat(),
-            "attendee_name": new_event.attendee_name,
-            "attendee_email": new_event.attendee_email,
-            "location": new_event.location
-        }
+        # Get host settings for notifications
+        host_settings = db.query(Settings).filter(Settings.user_id == host_user.id).first()
+        host_profile = db.query(Profile).filter(Profile.user_id == host_user.id).first()
+
+        # Send email notifications
+        if host_settings and host_settings.email_settings:
+            try:
+                # Send to attendee
+                await send_booking_confirmation_email(
+                    to_email=booking.email,
+                    event_title=event_type.name,
+                    event_time=start_time,
+                    attendee_name=booking.name,
+                    host_name=host_profile.full_name,
+                    location=booking.location,
+                    email_settings=host_settings.email_settings,
+                )
+                
+                # Send to host
+                await send_booking_confirmation_email(
+                    to_email=host_user.email,
+                    event_title=f"New Booking: {event_type.name}",
+                    event_time=start_time,
+                    attendee_name=booking.name,
+                    host_name=host_profile.full_name,
+                    location=booking.location,
+                    email_settings=host_settings.email_settings
+                )
+            except Exception as e:
+                print(f"Failed to send booking confirmation email: {str(e)}")
+
+        # Send SMS notifications
+        if (host_settings and 
+            host_settings.sms_settings and 
+            host_settings.notification_settings.get('sms', {}).get('enabled') and
+            booking.phone):
+            try:
+                # Send to attendee
+                await send_booking_confirmation_sms(
+                    to_phone=booking.phone,
+                    event_title=event_type.name,
+                    event_time=start_time,
+                    sms_settings=host_settings.sms_settings
+                )
+                
+                # Send to host if phone available
+                if host_profile.phone:
+                    await send_booking_confirmation_sms(
+                        to_phone=host_profile.phone,
+                        event_title=f"New Booking: {event_type.name}",
+                        event_time=start_time,
+                        sms_settings=host_settings.sms_settings
+                    )
+            except Exception as e:
+                print(f"Failed to send booking confirmation SMS: {str(e)}")
+
+        return db_booking
 
     except HTTPException:
         raise

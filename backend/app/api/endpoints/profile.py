@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.responses import JSONResponse
+import pytz
 from sqlalchemy.orm import Session
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 import json
 import os
 from ...db.database import get_db
@@ -131,3 +132,8 @@ async def update_profile(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
+    
+@router.get("/timezones", response_model=List[str])
+async def get_timezones():
+    """Get list of available timezones"""
+    return pytz.all_timezones

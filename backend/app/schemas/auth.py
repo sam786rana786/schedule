@@ -19,3 +19,14 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: str | None = None
+
+class UserMe(BaseModel):
+    id: int
+    email: str
+    name: str | None
+    phone: str | None
+    is_active: bool
+    valid: bool = True
+
+    class Config:
+        from_attributes = True

@@ -15,10 +15,11 @@ class Event(Base):
     description = Column(String, nullable=True)
     attendee_name = Column(String, nullable=True)
     attendee_email = Column(String, nullable=True)
+    attendee_phone = Column(String, nullable=True)
     location = Column(String, nullable=True)
-    answers = Column(JSON, nullable=True)  # Added answers column
+    answers = Column(JSON, nullable=True)
     is_confirmed = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Define relationships
     user = relationship("User", back_populates="events")

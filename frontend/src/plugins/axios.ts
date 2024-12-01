@@ -5,10 +5,12 @@ import { useAuthStore } from '@/stores/auth'; // We'll create this
 import { useNotificationStore } from '@/stores/notification';
 
 const axiosInstance = axios.create({
-    baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    baseURL: 'http://127.0.0.1:8000',
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
 });
 
 // Add a request interceptor

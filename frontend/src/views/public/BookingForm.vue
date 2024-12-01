@@ -17,6 +17,7 @@ const error = ref<string | null>(null);
 interface FormData {
     name: string;
     email: string;
+    phone: string;
     notes: string;
     location: string;
     answers: Record<string, string>;
@@ -25,6 +26,7 @@ interface FormData {
 const formData = ref<FormData>({
     name: '',
     email: '',
+    phone: '',
     notes: '',
     location: '',
     answers: {}
@@ -93,10 +95,22 @@ onMounted(async () => {
     }
 });
 
+const convertTimeTo24Hour = (time: string): string => {
+  const [hours, minutes] = time.split(/[: ]/); // Split by colon and space
+  const isPM = time.toLowerCase().includes("pm");
+  let hour24 = parseInt(hours, 10);
+
+  if (isPM && hour24 !== 12) hour24 += 12; // Convert PM to 24-hour
+  if (!isPM && hour24 === 12) hour24 = 0;  // Convert 12 AM to 0
+
+  return `${String(hour24).padStart(2, "0")}:${minutes}`;
+};
+
 const handleSubmit = async () => {
     try {
         if (!eventType.value) return;
         const formattedDate = formatDateForBackend(route.query.date as string);
+        const timeIn24Hour = convertTimeTo24Hour(route.query.time as string);
 
         // Validate required questions
         const missingRequired = eventType.value.questions?.filter(q =>
@@ -111,9 +125,10 @@ const handleSubmit = async () => {
         const bookingData = {
             event_type_id: eventType.value.id,
             date: formattedDate,
-            time: route.query.time as string,
+            time: timeIn24Hour,
             name: formData.value.name,
             email: formData.value.email,
+            phone: formData.value.phone,
             notes: formData.value.notes,
             location: formData.value.location,
             answers: formData.value.answers
@@ -193,6 +208,13 @@ const formatDateForBackend = (isoDate: string): string => {
                             <input type="email" id="email" v-model="formData.email" required
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
                         </div>
+                        <div>
+                            <label for="phone" class="block text-sm font-medium text-gray-700">Contact Number
+                                <span class="text-red-500">*</span>
+                            </label>
+                            <input type="tel" id="phone" v-model="formData.phone" required
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                        </div>
 
                         <!-- Location Selection -->
                         <div v-if="locationOptions.length > 1">
@@ -237,11 +259,11 @@ const formatDateForBackend = (isoDate: string): string => {
                         </div>
 
                         <!-- Additional Notes -->
-                        <div>
+                        <!-- <div>
                             <label for="notes" class="block text-sm font-medium text-gray-700">Additional Notes</label>
                             <textarea id="notes" v-model="formData.notes" rows="3"
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                        </div>
+                        </div> -->
                     </div>
 
                     <!-- Form Actions -->

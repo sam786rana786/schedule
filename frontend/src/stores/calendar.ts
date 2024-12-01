@@ -1,237 +1,127 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from '@/plugins/axios'
-import type { Event, EventCreate, CalendarDay, TimeSlot  } from '@/types/event'
+import type { Event, EventCreate, TimeSlot, EventType } from '@/types/event'
+import { getUserTimezone } from '@/utils/timezone';
 
-export const useCalendarStore = defineStore('calendar', () => {
-  const events = ref<Event[]>([])
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  const calendarDays = ref<CalendarDay[][]>([]);
+export const useCalendarStore = defineStore('calendar', {
+  state: () => ({
+    events: {
+      items: [] as Event[],
+      total: 0,
+      page: 1,
+      pages: 1
+    },
+    eventTypes: [],
+    selectedEventType: null as EventType | null,
+    isLoading: false,
+    error: null as string | null,
+    selectedDate: null as Date | null
+  }),
 
-  async function fetchAvailability({ eventTypeId, start, end }: { 
-    eventTypeId: number;
-    start: Date;
-    end: Date;
-  }) {
-    try {
-      isLoading.value = true;
-      
-      // First fetch events for the date range
-      await fetchEvents(start, end);
-      
-      // Process the calendar days with events data
-      calendarDays.value = processCalendarDays(start, end);
-      
-    } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Failed to fetch availability';
-      throw err;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  async function fetchEvents(startDate?: Date, endDate?: Date) {
-    try {
-      isLoading.value = true
-      let url = '/api/events'
-      const params: Record<string, string> = {}
-      
-      if (startDate) {
-        params.start_date = startDate.toISOString()
+  actions: {
+    async fetchEventTypes() {
+      try {
+        const response = await axios.get('/api/event-types');
+        this.eventTypes = response.data;
+      } catch (err) {
+        console.error('Failed to fetch event types:', err);
       }
-      if (endDate) {
-        params.end_date = endDate.toISOString()
-      }
+    },
 
-      const response = await axios.get(url, { params })
-      events.value = response.data
-    } catch (err: any) {
-      console.error('Error fetching events:', err)
-      error.value = err.response?.data?.detail || 'Failed to load events'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  async function createEvent(eventData: EventCreate) {
-    try {
-      isLoading.value = true
-
-      if (!eventData.start_time || !eventData.end_time) {
-        throw new Error('Start time and end time are required')
-      }
-
-      const response = await axios.post('/api/events', eventData)
-      events.value.push(response.data)
-      return response.data
-    } catch (err: any) {
-      console.error('Error creating event:', err)
-      error.value = err.response?.data?.detail || 'Failed to create event'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  async function updateEvent(eventId: number, eventData: Partial<Event>) {
-    try {
-      isLoading.value = true
-      const response = await axios.put(`/api/events/${eventId}`, eventData)
-      const index = events.value.findIndex((e: Event) => e.id === eventId)
-      if (index !== -1) {
-        events.value[index] = response.data
-      }
-      return response.data
-    } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Failed to update event'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  async function deleteEvent(eventId: number) {
-    try {
-      isLoading.value = true
-      await axios.delete(`/api/events/${eventId}`)
-      events.value = events.value.filter((e: Event) => e.id !== eventId)
-    } catch (err: any) {
-      error.value = err.response?.data?.detail || 'Failed to delete event'
-      throw err
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  function clearError() {
-    error.value = null
-  }
-
-  // Helper function to process availability data into calendar days
-  function processCalendarDays(start: Date, end: Date): CalendarDay[][] {
-    const weeks: CalendarDay[][] = [];
-    let currentWeek: CalendarDay[] = [];
-    
-    const month = start.getMonth();
-    const year = start.getFullYear();
-    
-    // Get first day of month and number of days
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const numDays = lastDay.getDate();
-    
-    // Fill in empty days before first of month
-    for (let i = 0; i < firstDay.getDay(); i++) {
-      currentWeek.push({
-        date: new Date(year, month, -i),
-        isCurrentMonth: false,
-        hasEvents: false,
-        available: false,
-        timeSlots: []
-      });
-    }
-    
-    // Fill in days of month
-    for (let day = 1; day <= numDays; day++) {
-      const date = new Date(year, month, day);
-      const dayEvents = events.value.filter(event => {
-        const eventDate = new Date(event.start_time);
-        return eventDate.toDateString() === date.toDateString();
-      });
-      
-      const timeSlots = getTimeSlotsForDate(date);
-      
-      currentWeek.push({
-        date,
-        isCurrentMonth: true,
-        hasEvents: dayEvents.length > 0,
-        available: timeSlots.some(slot => slot.available),
-        timeSlots
-      });
-      
-      if (currentWeek.length === 7) {
-        weeks.push(currentWeek);
-        currentWeek = [];
-      }
-    }
-    
-    // Fill in empty days after end of month
-    if (currentWeek.length > 0) {
-      const remainingDays = 7 - currentWeek.length;
-      for (let i = 1; i <= remainingDays; i++) {
-        currentWeek.push({
-          date: new Date(year, month + 1, i),
-          isCurrentMonth: false,
-          hasEvents: false,
-          available: false,
-          timeSlots: []
+    async getTimeSlotsForDate(startDate: string, endDate: string, eventTypeId?: number) {
+      try {
+        const params = new URLSearchParams({
+          start_date: startDate,
+          end_date: endDate,
+          timezone: 'Asia/Kolkata',
+          ...(eventTypeId && { event_type_id: eventTypeId.toString() })
         });
+
+        const response = await axios.get(`/api/timeslots?${params.toString()}`, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching time slots:', error);
+        throw error;
       }
-      weeks.push(currentWeek);
-    }
-    
-    return weeks;
-  }
+    },
 
-  function getTimeSlotsForDate(date: Date): TimeSlot[] {
-    const slots: TimeSlot[] = [];
-    const startHour = 9;
-    const endHour = 17;
-    
-    // Don't show slots for past dates
-    if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
-      return [];
-    }
+    setSelectedEventType(eventType: EventType | null) {
+      this.selectedEventType = eventType;
+    },
 
-    for (let hour = startHour; hour < endHour; hour++) {
-      for (let minutes of [0, 30]) {
-        const slotTime = new Date(date);
-        slotTime.setHours(hour, minutes, 0, 0);
-        
-        // Don't show past slots for today
-        if (date.toDateString() === new Date().toDateString() && slotTime < new Date()) {
-          continue;
+    async createEvent(eventData: any) {
+      try {
+        const response = await axios.post('/api/events', {
+          ...eventData,
+          created_at: new Date().toISOString()
+        });
+        // Add new event to state
+        this.events.items.push(response.data);
+        // Refresh events for the month
+        if (this.selectedDate) {
+          const start = new Date(this.selectedDate.getFullYear(), this.selectedDate.getMonth());
+          const end = new Date(this.selectedDate.getFullYear(), this.selectedDate.getMonth() + 1);
+          await this.fetchEvents(start, end);
         }
-        
-        // Check if slot is booked
-        const isBooked = events.value.some(event => {
-          const eventStart = new Date(event.start_time);
-          const eventEnd = new Date(event.end_time);
-          return slotTime >= eventStart && slotTime < eventEnd;
-        });
-        
-        const eventInfo = events.value.find(event => {
-          const eventStart = new Date(event.start_time);
-          const eventEnd = new Date(event.end_time);
-          return slotTime >= eventStart && slotTime < eventEnd;
-        });
+        return response.data;
+      } catch (error) {
+        console.error('Error creating event:', error);
+        throw error;
+      }
+    },
 
-        slots.push({
-          time: `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`,
-          available: !isBooked,
-          event: eventInfo,
-          date: slotTime
-        });
+    async updateEvent(eventId: number, eventData: Partial<Event>) {
+      try {
+        this.isLoading = true;
+        const response = await axios.put(`/api/events/${eventId}`, eventData);
+        const index = this.events.items.findIndex(e => e.id === eventId);
+        if (index !== -1) {
+          this.events.items[index] = response.data;
+        }
+        return response.data;
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to update event';
+        throw err;
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async deleteEvent(eventId: number) {
+      try {
+        this.isLoading = true;
+        await axios.delete(`/api/events/${eventId}`);
+        this.events.items = this.events.items.filter(e => e.id !== eventId);
+      } catch (err: any) {
+        this.error = err.response?.data?.detail || 'Failed to delete event';
+        throw err;
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async fetchEvents(startDate?: Date, endDate?: Date) {
+      this.isLoading = true;
+      try {
+        const params = {
+          start_date: startDate?.toISOString(),
+          end_date: endDate?.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const response = await axios.get('/api/events', { params });
+        this.events = response.data;
+      } catch (err) {
+        this.error = 'Failed to fetch events';
+        throw err;
+      } finally {
+        this.isLoading = false;
       }
     }
-    
-    return slots;
   }
-
-
-  return {
-    events,
-    isLoading,
-    error,
-    calendarDays,
-    fetchAvailability,
-    fetchEvents,
-    createEvent,
-    updateEvent,
-    deleteEvent,
-    clearError,
-    getTimeSlotsForDate
-  }
-})
+});
