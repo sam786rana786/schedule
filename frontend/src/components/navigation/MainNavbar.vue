@@ -11,7 +11,7 @@ const isMenuOpen = ref(false);
       <div class="flex justify-between h-16">
         <div class="flex items-center">
           <RouterLink to="/" class="flex-shrink-0">
-            <img class="h-8 w-auto" src="../../assets/logo.svg" alt="Schedule" />
+            <img class="h-8 w-auto" src="@/assets/logo.png" alt="Schedule" />
           </RouterLink>
           <div class="hidden md:ml-6 md:flex md:space-x-8">
             <RouterLink to="/features" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900">
