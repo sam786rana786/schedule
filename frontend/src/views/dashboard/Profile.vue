@@ -3,12 +3,17 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import axios from '@/plugins/axios';
 import { useProfileStore } from '@/stores/profile'
 
+interface TimezoneOption {
+  value: string;
+  label: string;
+}
+
 const profileStore = useProfileStore()
 const successMessage = ref('')
 const companyLogoFile = ref<File | null>(null)
 const avatarFile = ref<File | null>(null)
 const avatarPreview = ref<string | null>(null)
-const timezones = ref<string[]>([]);
+const timezones = ref<TimezoneOption[]>([]);
 
 // Create computed properties with default values
 const profile = computed(() => {
@@ -117,7 +122,7 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([
+  await Promise.all([    
     profileStore.fetchProfile(),
     fetchTimezones()
   ]);
@@ -247,8 +252,8 @@ onMounted(async () => {
         class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
       >
         <option value="">Select a timezone</option>
-        <option v-for="tz in timezones" :key="tz" :value="tz">
-          {{ tz }}
+        <option v-for="tz in timezones" :key="tz.value" :value="tz.value">
+          {{ tz.label }}
         </option>
       </select>
     </div>

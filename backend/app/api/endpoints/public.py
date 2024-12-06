@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 from ...db.database import get_db
 import re
 from ...models.event_type import EventType
@@ -9,6 +9,7 @@ from ...models.event import Event
 from ...models.user import User
 from ...models.profile import Profile
 from ...models.settings import Settings
+from ...schemas.profile import UserProfileSchema
 from ...schemas.event_type import EventType as EventTypeSchema
 from ...schemas.booking import BookingCreate, BookingResponse
 from ...utils.notifications import send_booking_confirmation_email, send_booking_confirmation_sms
@@ -287,3 +288,30 @@ async def get_public_booking(
         )
     
     return booking
+
+@router.get("/public/profile/{user_id}", response_model=UserProfileSchema)
+async def get_user_profile(
+    user_id: int, 
+    db: Session = Depends(get_db)
+    ) -> Any:
+    # Query the user profile based on the user_id
+    user_profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+
+    if not user_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile not found"
+        )
+    
+    # Format the response data
+    response_data = {
+        "full_name": user_profile.full_name,
+        "company_logo": user_profile.company_logo,
+        "company": user_profile.company,
+        "avatar_url": user_profile.avatar_url,
+        "welcome_message": user_profile.welcome_message,
+        "phone": user_profile.phone,
+        "time_zone": user_profile.time_zone
+    }
+    
+    return response_data

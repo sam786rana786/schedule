@@ -7,11 +7,11 @@ class EventType(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String, nullable=False)
-    slug = Column(String, nullable=False, unique=True, index=True)
-    description = Column(String, nullable=True)
+    name = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=False, unique=True, index=True)
+    description = Column(String(255), nullable=True)
     duration = Column(Integer, nullable=False)  # duration in minutes
-    color = Column(String, nullable=False, default="#3B82F6")  # default blue color
+    color = Column(String(255), nullable=False, default="#3B82F6")  # default blue color
     is_active = Column(Boolean, default=True)
     locations = Column(JSON, nullable=True)  # Store location options (Google Meet, Zoom, etc.)
     questions = Column(JSON, nullable=True)  # Additional questions for bookings

@@ -187,7 +187,7 @@ onMounted(async () => {
             </div>
 
             <!-- Custom Questions -->
-            <div v-if="booking.answers" class="border-t border-gray-200 pt-6">
+            <div v-if="booking.answers && booking.answers.length > 0" class="border-t border-gray-200 pt-6">
               <h4 class="text-sm font-medium text-gray-900 mb-4">Additional Information</h4>
               <dl class="space-y-3">
                 <template v-for="(answer, label) in formattedAnswers" :key="label">

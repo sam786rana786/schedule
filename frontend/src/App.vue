@@ -15,10 +15,10 @@ const isDashboard = computed(() => {
   return isAuthenticated && isDashboardRoute;
 });
 
-const isAuthRoute = computed(() => {
-  return ['/login', '/signup', '/forgot-password'].includes(route.path);
+const isNoLayoutRoute = computed(() => {
+  const noLayoutRoutes = ['public-booking', 'booking-form', 'booking-confirmation'];
+  return noLayoutRoutes.includes(route.name as string);
 });
-
 </script>
 
 <template>
@@ -27,6 +27,10 @@ const isAuthRoute = computed(() => {
     <DashboardLayout>
       <RouterView />
     </DashboardLayout>
+  </template>
+
+  <template v-else-if="isNoLayoutRoute">
+    <RouterView />
   </template>
   
   <template v-else>

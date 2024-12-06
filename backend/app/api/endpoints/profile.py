@@ -1,6 +1,7 @@
+import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.responses import JSONResponse
-import pytz
+from pytz import common_timezones, timezone
 from sqlalchemy.orm import Session
 from typing import Annotated, List, Optional
 import json
@@ -9,19 +10,9 @@ from ...db.database import get_db
 from ...core.auth import get_current_user
 from ...models.user import User
 from ...models.profile import Profile as ProfileModel
-from ...schemas.profile import Profile, ProfileUpdate
+from ...schemas.profile import Profile, ProfileUpdate, TimezoneResponse
 
 router = APIRouter()
-
-@router.options("/me")
-async def profile_options():
-    return JSONResponse(
-        content={"message": "OK"},
-        headers={
-            "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        }
-    )
 
 @router.get("/me", response_model=Profile)
 async def get_profile(
@@ -133,7 +124,9 @@ async def update_profile(
             detail=str(e)
         )
     
-@router.get("/timezones", response_model=List[str])
-async def get_timezones():
-    """Get list of available timezones"""
-    return pytz.all_timezones
+@router.get("/timezones", response_model=List[TimezoneResponse])
+def get_timezones():
+    timezone_choices = []
+    for tz in common_timezones:
+        timezone_choices.append(TimezoneResponse(label=f"{tz.replace('_', ' ')} ({tz})", value=tz))
+    return timezone_choices

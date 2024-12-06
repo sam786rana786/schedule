@@ -23,18 +23,6 @@ const handleToggle = async (id: number) => {
     notificationStore.showNotification('error', 'Failed to update event type');
   }
 };
-
-const copyBookingUrl = async (slug: string) => {
-  const baseUrl = window.location.origin;
-  const bookingUrl = `${baseUrl}/book/${slug}`;
-  
-  try {
-    await navigator.clipboard.writeText(bookingUrl);
-    notificationStore.showNotification('success', 'Booking URL copied to clipboard');
-  } catch (error) {
-    notificationStore.showNotification('error', 'Failed to copy URL');
-  }
-};
 </script>
 
 <template>
@@ -55,8 +43,7 @@ const copyBookingUrl = async (slug: string) => {
         <EventTypesList 
           :event-types="eventTypeStore.eventTypes"
           :is-loading="eventTypeStore.isLoading"
-          @toggle="handleToggle"
-          @copy-url="copyBookingUrl"
+          @toggle="handleToggle" 
         />
       </div>
     </div>

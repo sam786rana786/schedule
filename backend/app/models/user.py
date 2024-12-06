@@ -6,8 +6,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    email = Column(String(255), unique=True, index=True)
+    hashed_password = Column(String(255))
     is_active = Column(Boolean, default=True)
 
     # Relationships
@@ -16,4 +16,3 @@ class User(Base):
     sms_subscription = relationship("SMSSubscription", back_populates="user", uselist=False)
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
     event_types = relationship("EventType", back_populates="user", cascade="all, delete-orphan")
-    integrations = relationship("Integration", back_populates="user", cascade="all, delete-orphan")

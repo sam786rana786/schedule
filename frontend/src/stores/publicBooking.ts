@@ -67,6 +67,19 @@ export const usePublicBookingStore = defineStore('publicBooking', () => {
     }
   }
 
+  async function getProfileByUserId(userId: string) {
+    try {
+      isLoading.value = true;
+      const response = await axios.get(`/public/profile/${userId}`);
+      return response.data;
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || 'Failed to load user profile';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   return {
     eventType,
     isLoading,
@@ -74,6 +87,7 @@ export const usePublicBookingStore = defineStore('publicBooking', () => {
     fetchPublicEventType,
     getAvailableSlots,
     createBooking,
-    getBooking
+    getBooking,
+    getProfileByUserId
   }
 })

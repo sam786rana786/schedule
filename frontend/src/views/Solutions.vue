@@ -9,7 +9,7 @@ const solutions = [
       'Meeting analytics',
       'CRM integration'
     ],
-    image: '/src/assets/images/sales-meeting.png'
+    image: '/assets/sales-meeting.png'
   },
   {
     title: 'Customer Success',
@@ -20,7 +20,7 @@ const solutions = [
       'Custom reminder workflows',
       'Integration with help desk'
     ],
-    image: '/src/assets/images/customer-success.png'
+    image: '/assets/customer-success.png'
   },
   {
     title: 'Recruiting',
@@ -31,7 +31,7 @@ const solutions = [
       'Calendar coordination',
       'ATS integration'
     ],
-    image: '/src/assets/images/recruiting.png'
+    image: '/assets/recruiting.png'
   }
 ];
 </script>

@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePublicBookingStore } from '@/stores/publicBooking';
 import { useNotificationStore } from '@/stores/notification';
+import { Clock, Map, MapPin } from 'lucide-vue-next';
 import type { EventType, Question } from '@/types/eventType';
 
 const route = useRoute();
@@ -13,6 +14,11 @@ const notificationStore = useNotificationStore();
 const eventType = ref<EventType | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
+const companyLogo = ref<string | null>(null);
+const userPic = ref<string | null>(null);
+const userName = ref<string | null>(null);
+const company = ref<string | null>(null);
+const timeZone = ref<string | null>(null);
 
 interface FormData {
     name: string;
@@ -71,6 +77,15 @@ onMounted(async () => {
         // Fetch event type using public store
         const fetchedEventType = await bookingStore.fetchPublicEventType(slug);
         eventType.value = fetchedEventType;
+
+        if(eventType.value) {
+            const profile = await bookingStore.getProfileByUserId(eventType.value.user_id.toString());
+            companyLogo.value = profile.company_logo || null;
+            userPic.value = profile.avatar_url || null;
+            userName.value = profile.full_name || null;
+            company.value = profile.company || null;
+            timeZone.value = profile.time_zone || null;
+        }
 
         if (!eventType.value) {
             error.value = 'Event type not found';
@@ -161,7 +176,35 @@ const formatDateForBackend = (isoDate: string): string => {
 
 <template>
     <div class="min-h-screen bg-gray-50 py-12">
-        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto flex flex-col lg:flex-row bg-white shadow rounded-lg overflow-hidden">
+            <!-- Left Section: Event Details -->
+            <div class="flex-shrink-0 w-full lg:w-1/2 p-6 bg-gray-100 border-r border-gray-200">
+                <img :src="`http://127.0.0.1:8000${companyLogo}`" alt="Company Logo" class="mb-4">
+                <hr />
+                <h2 class="text-lg font-bold text-gray-800 mb-2">{{ eventType?.name }}</h2>
+                <p class="text-sm text-gray-600 mt-2">
+                {{ eventType?.duration }} min
+                </p>
+                <div class="mt-4 text-sm text-gray-600 space-y-2">
+                <div class="flex items-center mb-4">
+                    <MapPin class="h-5 w-5 mr-2 text-gray-500" />
+                    <span>{{ company }}</span>
+                </div>
+                <div class="flex items-center mb-4">
+                    <Clock class="h-5 w-5 mr-2 text-gray-500" />
+                    <span>
+                    {{ selectedDateTime }}
+                    </span>
+                </div>
+                <div class="flex items-center mb-4">
+                    <Map class="h-5 w-5 mr-2 text-gray-500" />
+                    <span>{{ timeZone }}</span>
+                </div>
+                </div>
+                <p class="mt-6 text-sm text-gray-700">
+                Meeting is with <strong>{{ userName }}</strong>.
+                </p>
+            </div>
             <!-- Loading State -->
             <div v-if="isLoading" class="flex justify-center py-12">
                 <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -179,15 +222,10 @@ const formatDateForBackend = (isoDate: string): string => {
                 <button @click="router.push('/')" class="mt-4 text-blue-600 hover:text-blue-500">
                     Return to Homepage
                 </button>
-            </div>
+            </div>           
 
             <!-- Booking Form -->
-            <div v-else-if="eventType" class="bg-white shadow rounded-lg overflow-hidden">
-                <!-- Header -->
-                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h1 class="text-xl font-semibold text-gray-900">{{ eventType.name }}</h1>
-                    <p class="mt-1 text-sm text-gray-500">{{ selectedDateTime }}</p>
-                </div>
+            <div v-else-if="eventType" class="w-full lg:w-2/3 p-6">
 
                 <form @submit.prevent="handleSubmit" class="px-4 py-5 sm:p-6 space-y-6">
                     <!-- Basic Information -->
@@ -198,7 +236,7 @@ const formatDateForBackend = (isoDate: string): string => {
                                 <span class="text-red-500">*</span>
                             </label>
                             <input type="text" id="name" v-model="formData.name" required
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                class="mt-1 block w-full px-2 py-2 border rounded-md shadow-sm focus:ring-blue-500 hover:border-blue-500 focus:border-blue-600 sm:text-sm" />
                         </div>
 
                         <div>
@@ -206,14 +244,14 @@ const formatDateForBackend = (isoDate: string): string => {
                                 <span class="text-red-500">*</span>
                             </label>
                             <input type="email" id="email" v-model="formData.email" required
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                class="mt-1 block w-full border px-2 py-2 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
                         </div>
                         <div>
                             <label for="phone" class="block text-sm font-medium text-gray-700">Contact Number
                                 <span class="text-red-500">*</span>
                             </label>
                             <input type="tel" id="phone" v-model="formData.phone" required
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+                                class="mt-1 block w-full px-2 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
                         </div>
 
                         <!-- Location Selection -->
@@ -257,19 +295,12 @@ const formatDateForBackend = (isoDate: string): string => {
                                 </select>
                             </div>
                         </div>
-
-                        <!-- Additional Notes -->
-                        <!-- <div>
-                            <label for="notes" class="block text-sm font-medium text-gray-700">Additional Notes</label>
-                            <textarea id="notes" v-model="formData.notes" rows="3"
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></textarea>
-                        </div> -->
                     </div>
 
                     <!-- Form Actions -->
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between pt-4 border-gray-200">
                         <button type="button" @click="router.back()"
-                            class="text-sm font-medium text-gray-600 hover:text-gray-500">
+                            class="text-sm font-medium text-white rounded-md hover:text-gray-500 bg-yellow-600 px-4 py-2 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                             Back
                         </button>
                         <button type="submit"
