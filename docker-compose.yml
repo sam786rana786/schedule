@@ -9,7 +9,7 @@ services:
     tty: true
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=mysql+pymysql://secure_user:S3cur3P@ssw0rd!@mysql:3306/secure_db
+      - DATABASE_URL=mysql+pymysql://9eyJzdWIiOiJmY:IUzI1NiIsInR5cCI6I@mysql:3306/9oQG1haWxpbm
     volumes:
       - ./backend:/app
     ports:
@@ -42,10 +42,10 @@ services:
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: S3cur3P@ssw0rd!
-      MYSQL_DATABASE: secure_db
-      MYSQL_USER: secure_user
-      MYSQL_PASSWORD: S3cur3P@ssw0rd!
+      MYSQL_ROOT_PASSWORD: IUzI1NiIsInR5cCI6I
+      MYSQL_DATABASE: 9oQG1haWxpbm
+      MYSQL_USER: 9eyJzdWIiOiJmY
+      MYSQL_PASSWORD: IUzI1NiIsInR5cCI6I
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
