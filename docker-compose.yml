@@ -9,7 +9,7 @@ services:
     tty: true
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=mysql+pymysql://root:password@mysql:3306/mydatabase
+      - DATABASE_URL=mysql+pymysql://secure_user:S3cur3P@ssw0rd!@mysql:3306/secure_db
     volumes:
       - ./backend:/app
     ports:
@@ -32,7 +32,6 @@ services:
       - VITE_API_URL=http://localhost:8000
     volumes:
       - ./frontend:/app
-      
     ports:
       - "8080:8080"
     networks:
@@ -43,10 +42,10 @@ services:
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: mydatabase
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: S3cur3P@ssw0rd!
+      MYSQL_DATABASE: secure_db
+      MYSQL_USER: secure_user
+      MYSQL_PASSWORD: S3cur3P@ssw0rd!
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
