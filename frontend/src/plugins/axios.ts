@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'; // We'll create this
 import { useNotificationStore } from '@/stores/notification';
 
 const axiosInstance = axios.create({
-    baseURL: API_URL,
+    baseURL: "http://fastapi-backend:8000",
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
