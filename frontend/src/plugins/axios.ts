@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'; // We'll create this
 import { useNotificationStore } from '@/stores/notification';
 
 const axiosInstance = axios.create({
-    baseURL: "http://fastapi-backend:8000",
+    baseURL: API_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -30,31 +30,18 @@ axiosInstance.interceptors.request.use(
 // Add a response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     const authStore = useAuthStore();
-    
-    // Check if error is due to an invalid token
-    if (error.response?.status === 401 && 
-        error.response?.data?.detail === "Could not validate credentials") {
-      // Clear auth state
-      await authStore.logout();
-      
-      // Get current route for redirect after login
-      const currentRoute = router.currentRoute.value;
-      const returnUrl = currentRoute.fullPath;
-      
-      // Redirect to login with message
-      await router.replace({ 
-        path: '/login', 
-        query: { 
-          returnUrl: returnUrl !== '/login' ? returnUrl : undefined,
-          message: 'Logged out due to inactivity'
-        }
-      });
+    const notificationStore = useNotificationStore();
+
+    if (error.response.status === 401) {
+      authStore.logout();
+      router.push('/login');
     }
+
+    notificationStore.showNotification('error', error.response.data.message || 'An error occurred');
     return Promise.reject(error);
   }
 );
-
 
 export default axiosInstance;
