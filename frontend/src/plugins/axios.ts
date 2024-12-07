@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'; // We'll create this
 import { useNotificationStore } from '@/stores/notification';
 
 const axiosInstance = axios.create({
-    baseURL: 'http://127.0.0.1:8000',
+    baseURL: API_URL,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
