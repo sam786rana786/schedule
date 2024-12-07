@@ -1,13 +1,13 @@
 services:
   reverse-proxy:
-    image: traefik:v3.1
+    image: traefik:v3.2
     command: 
       - "--api.insecure=true"
       - "--providers.docker"
-      - "--provider.docker.exposedbydefault=false"
+      - "--providers.docker.exposedbydefault=false"
       - "--entryPoints.websecure.address=:443"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=akshiptikainfotech@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.email=${TRAEFIK_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
@@ -18,6 +18,8 @@ services:
     volumes:
       - letsencrypt:/letsencrypt
       - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - app-network
 
   backend:
     build:
@@ -29,7 +31,7 @@ services:
     tty: true    
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=mysql+pymysql://secure_user:S3cur3Pssw0rd!@mysql:3306/secure_db
+      - DATABASE_URL=${DATABASE_URL}
     volumes:
       - ./backend:/app
     ports:
@@ -56,7 +58,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://popsita.com:8000
+      - VITE_API_URL=${VITE_API_URL}
     volumes:
       - ./frontend:/app
     networks:
@@ -67,10 +69,10 @@ services:
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: S3cur3Pss          
-      MYSQL_DATABASE: secure_db  
-      MYSQL_USER: secure_user
-      MYSQL_PASSWORD: S3cur3Pssw0rd
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
