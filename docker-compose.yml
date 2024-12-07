@@ -4,10 +4,16 @@ services:
     command: 
       - "--api.insecure=true"
       - "--providers.docker"
+      - "--provider.docker.exposedbydefault=false"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=akshiptikainfotech@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
-      - "80:80"
+      - "443:443"
       - "8080:8080"
     volumes:
+      - letsencrypt:/letsencrypt
       - "/var/run/docker.sock:/var/run/docker.sock"
 
   backend:
@@ -39,7 +45,10 @@ services:
     restart: unless-stopped
     tty: true
     labels:
+      - "traefik.enable=true"
       - "traefik.http.routers.vue-frontend.rule=Host(`popsita.com`)"
+      - "traefik.http.routers.vue-frontend.entrypoints=websecure"
+      - "traefik.http.routers.vue-frontend.tls.certresolver=myresolver"
     ports:
       - "3000:3000"
     environment:
@@ -71,4 +80,5 @@ networks:
     driver: bridge
 
 volumes:
+  letsencrypt:
   mysql-data:
