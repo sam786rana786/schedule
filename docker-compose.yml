@@ -40,6 +40,8 @@ services:
     tty: true
     labels:
       - "traefik.http.routers.vue-frontend.rule=Host(`popsita.com`)"
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://0.0.0.0:8000

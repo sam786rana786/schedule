@@ -18,10 +18,6 @@ COPY . .
 # build app for production with minification
 RUN npm run build
 
-RUN rm -rf node_modules package-lock.json
-RUN npm i
-RUN npm run build
-
-EXPOSE 8080
+EXPOSE 3000
 
 CMD [ "http-server", "dist" ]
