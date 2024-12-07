@@ -9,7 +9,7 @@ services:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      
+
   backend:
     build:
       context: ./backend
@@ -17,7 +17,7 @@ services:
     image: fastapi-backend
     container_name: fastapi-backend
     restart: unless-stopped
-    tty: true
+    tty: true    
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=mysql+pymysql://secure_user:S3cur3Pssw0rd!@mysql:3306/secure_db
@@ -38,6 +38,8 @@ services:
     container_name: vue-frontend
     restart: unless-stopped
     tty: true
+    labels:
+      - "traefik.http.routers.vue-frontend.rule=Host(`popsita.com`)"
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://0.0.0.0:8000
