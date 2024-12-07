@@ -1,4 +1,15 @@
 services:
+  reverse-proxy:
+    image: traefik:v3.1
+    command: 
+      - "--api.insecure=true"
+      - "--providers.docker"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      
   backend:
     build:
       context: ./backend
@@ -29,11 +40,11 @@ services:
     tty: true
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://0.0.0.0:8000
     volumes:
       - ./frontend:/app
     ports:
-      - "8080:8080"
+      - "3000:8080"
     networks:
       - app-network
 
@@ -42,10 +53,10 @@ services:
     container_name: mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: S3cur3Pssw0rd!
-      MYSQL_DATABASE: secure_db
+      MYSQL_ROOT_PASSWORD: S3cur3Pss          
+      MYSQL_DATABASE: secure_db  
       MYSQL_USER: secure_user
-      MYSQL_PASSWORD: S3cur3Pssw0rd!
+      MYSQL_PASSWORD: S3cur3Pssw0rd
     volumes:
       - mysql-data:/var/lib/mysql
     ports:
