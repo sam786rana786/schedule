@@ -12,10 +12,13 @@ for model in models:
 
 app = FastAPI()
 
+origins = [
+    "http://localhost:3000",
+]
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Frontend development server
+    allow_origins=origins,  # Frontend development server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
