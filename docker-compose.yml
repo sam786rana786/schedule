@@ -9,7 +9,10 @@ services:
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.email=akshiptikainfotech@gmail.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
     ports:
+      - "80:80"
       - "443:443"
       - "8080:8080"
     volumes:
@@ -53,7 +56,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://0.0.0.0:8000
+      - VITE_API_URL=http://popsita.com:8000
     volumes:
       - ./frontend:/app
     networks:
