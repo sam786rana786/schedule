@@ -36,9 +36,9 @@ services:
       - ./backend:/app
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`backend.popsita.com`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.fastapi-backend.rule=Host(`backend.popsita.com`)"
+      - "traefik.http.routers.fastapi-backend.entrypoints=websecure"
+      - "traefik.http.routers.fastapi-backend.tls.certresolver=myresolver"
     networks:
       - app-network
     depends_on:
