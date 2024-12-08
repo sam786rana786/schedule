@@ -34,8 +34,11 @@ services:
       - DATABASE_URL=${DATABASE_URL}
     volumes:
       - ./backend:/app
-    ports:
-      - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`popsita.com`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
     networks:
       - app-network
     depends_on:
