@@ -1,0 +1,94 @@
+services:
+  reverse-proxy:
+    image: traefik:v3.2
+    command: 
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${TRAEFIK_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - letsencrypt:/letsencrypt
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - app-network
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: fastapi-backend
+    container_name: fastapi-backend
+    restart: unless-stopped
+    tty: true    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=${DATABASE_URL}
+      - ENV=production
+    volumes:
+      - ./backend:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fastapi-backend.rule=Host(`backend.popsita.com`)"
+      - "traefik.http.routers.fastapi-backend.entrypoints=websecure"
+      - "traefik.http.routers.fastapi-backend.tls.certresolver=myresolver"
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - app-network
+    depends_on:
+      - mysql
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: vue-frontend
+    container_name: vue-frontend
+    restart: unless-stopped
+    tty: true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vue-frontend.rule=Host(`popsita.com`)"
+      - "traefik.http.routers.vue-frontend.entrypoints=websecure"
+      - "traefik.http.routers.vue-frontend.tls.certresolver=myresolver"
+      - "com.centurylinklabs.watchtower.enable=true"
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${VITE_API_URL}
+    volumes:
+      - ./frontend:/app
+    networks:
+      - app-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  letsencrypt:
+  mysql-data:
